@@ -32,8 +32,14 @@ label{font-size:13px;color:#bbb}
 .abc-render-temp{position:fixed;left:0;top:-9999px;width:900px;visibility:hidden;pointer-events:none}
 
 .system-block{background:#1b1b1b;color:#eee;border:1px solid #2a2a2a;border-radius:4px;margin:0 0 18px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.4)}
-.score-host{width:100%;padding:6px 10px 0;background:#1b1b1b;overflow:hidden}
-.score-host svg{display:block;width:100%;height:auto;max-width:100%;filter:invert(1) hue-rotate(180deg)}
+/* abcjs always draws notation in black, regardless of the page theme (there is no
+   dark-mode option to request light ink). filter:invert() previously used here to
+   "fix" that just flipped whatever color the notes actually were - worthless if they
+   were already dark, and it can't be relied on generally. Giving the score its own
+   white "paper" panel, like real sheet music, guarantees black-on-white contrast no
+   matter what abcjs does internally, and needs no filter at all. */
+.score-host{width:100%;padding:10px 10px 4px;background:#fff;border-radius:4px 4px 0 0;overflow:hidden}
+.score-host svg{display:block;width:100%;height:auto;max-width:100%}
 .santoor-tab{background:#1b1b1b;padding:5px 10px 10px;border-top:1px solid #333}
 .tab-row{display:grid;grid-template-columns:58px minmax(0,1fr);height:30px;align-items:center}
 .tab-label{font:700 9px/30px Arial,sans-serif;letter-spacing:.08em;color:#999}
@@ -56,7 +62,6 @@ footer{color:#777;font-size:12px;margin-top:18px}
   .score-panel>.section-title,.score-panel>.tab-explanation{display:none}
   .system-block{box-shadow:none;break-inside:avoid;margin-bottom:12px;background:#fff;border:0}
   .score-host{background:#fff}
-  .score-host svg{filter:none}
   .santoor-tab{background:#fff;border-top-color:#ddd}
   .tab-number{background:#fff;color:#000}
   .tab-label{color:#000}
