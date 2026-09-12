@@ -140,7 +140,12 @@ function buildTabSystem(svg,events){
  const scoreHost=document.createElement('div');scoreHost.className='score-host';
  scoreHost.appendChild(svg);wrap.appendChild(scoreHost);
  const tab=document.createElement('div');tab.className='santoor-tab';
- const noteEls=Array.from(svg.querySelectorAll('.abcjs-note'));
+ // !class=XXX! is a real, documented abcjs decoration (docs.abcjs.net/overview/abc-notation)
+ // that tags "the next note or bar line" with an extra CSS class. We don't assume it lands
+ // on an element that *also* carries abcjs-note - we just find whatever element carries our
+ // own santoor-note-N class, in document order, which is all buildTabSystem actually needs.
+ const noteEls=Array.from(svg.querySelectorAll('[class*="santoor-note-"]'));
+ if(!noteEls.length&&events.length)window.__santoorTagMiss=true;
  const rows=[['HIGH','H'],['MIDDLE','M'],['BASS','B']];
  for(const [label,prefix] of rows){
    const row=document.createElement('div');row.className='tab-row';
@@ -167,7 +172,8 @@ function buildTabSystem(svg,events){
 function repositionTabs(){
  document.querySelectorAll('.system-block').forEach(block=>{
    const svg=block.querySelector('svg');if(!svg)return;
-   const noteEls=Array.from(svg.querySelectorAll('.abcjs-note'));
+   // Must match the selector buildTabSystem() used to build this element's noteIndex.
+   const noteEls=Array.from(svg.querySelectorAll('[class*="santoor-note-"]'));
    block.querySelectorAll('.tab-lane').forEach(lane=>{
      const laneRect=lane.getBoundingClientRect();
      lane.querySelectorAll('.tab-number').forEach(n=>{
@@ -194,6 +200,7 @@ function render(){
  const raw=document.getElementById('abcInput').value;const systems=document.getElementById('systems');const warnings=document.getElementById('warnings');systems.innerHTML='';warnings.textContent='';
  try{
    const events=parseEvents(raw);const tagged=decorateABC(raw);
+   window.__santoorTagMiss=false;
    const w=getScoreWidth();
    const temp=document.createElement('div');temp.className='abc-render-temp';temp.style.width=w+'px';temp.setAttribute('aria-hidden','true');document.body.appendChild(temp);
    ABCJS.renderAbc(temp,tagged,{responsive:'resize',add_classes:true,staffwidth:w,oneSvgPerLine:true,wrap:{minSpacing:1.7,maxSpacing:2.5,preferredMeasuresPerLine:5},paddingtop:8,paddingbottom:8});
@@ -204,6 +211,9 @@ function render(){
    for(const svg of svgs)systems.appendChild(buildTabSystem(svg,events));
    temp.remove();
    document.title='Santoor ABC Tab';
+   if(window.__santoorTagMiss){
+     warnings.textContent='No note markers were found in the rendered SVG, so tablature numbers could not be placed. This usually means the abcjs version loaded no longer supports the !class=XXX! decoration the way this page expects it to.';
+   }
    requestAnimationFrame(()=>requestAnimationFrame(repositionTabs));
  }catch(err){warnings.textContent='ABC rendering error: '+err.message}
 }
