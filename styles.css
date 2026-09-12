@@ -24,10 +24,13 @@ label{font-size:13px;color:#bbb}
 #tab{margin-top:10px}
 .tab-system{border-top:1px solid #555;margin-top:14px;padding-top:8px;overflow-x:auto}
 .tab-system-title{font-size:11px;color:#777;margin-bottom:2px}
-.tab-row{display:flex;align-items:center;min-height:30px}
-.tab-row-label{width:70px;flex:0 0 70px;font-weight:bold;font-size:11px;color:#aaa}
-.tab-lane{position:relative;height:28px;border-bottom:1px solid #444;background:linear-gradient(to bottom,transparent 0,transparent 13px,#333 14px,transparent 15px)}
-.course-mark{position:absolute;top:3px;transform:translateX(-50%);font:700 12px/20px Consolas,monospace;white-space:nowrap;color:#eee}
+.tab-explanation{font-size:12px;color:#777;margin:-5px 0 8px}
+.tab-group{margin:10px 0 16px}
+.tab-group-title{font-weight:bold;font-size:12px;color:#bbb;border-bottom:1px solid #555;padding:4px 0}
+.course-staff-row{display:flex;align-items:center;height:20px}
+.course-staff-label{width:42px;flex:0 0 42px;font:700 11px/20px Consolas,monospace;color:#aaa}
+.course-staff-lane{position:relative;height:20px;border-bottom:1px solid #444}
+.course-mark{position:absolute;top:0;transform:translateX(-50%);font:700 12px/19px Arial,sans-serif;white-space:nowrap;color:#eee}
 .course-mark.substitution{color:#f2c14e}
 .empty-tab{padding:20px;color:#888}
 .course-table{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
@@ -44,8 +47,9 @@ footer{color:#777;font-size:12px;margin-top:20px}
   .panel{border:0;margin:0;padding:0;background:#fff}
   #paper{padding:0}
   .tab-system{break-inside:avoid;color:#000}
-  .tab-row-label{color:#000}
-  .tab-lane{border-color:#aaa}
+  .course-staff-label{color:#000}
+  .course-staff-lane{border-color:#aaa}
   .course-mark{color:#000}
   .course-mark.substitution{color:#8a6200}
 }
+
