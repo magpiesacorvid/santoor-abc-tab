@@ -33,7 +33,7 @@ Just open `index.html` in a modern browser.
 
 ## Important implementation note
 
-The standard instrument definition contains all 27 courses, including B1. If an individual instrument has a broken course, that is a property of that instrument, not of the standard santoor layout.
+The standard instrument definition contains all 27 courses.
 
 The tab renderer uses ABCJS's rendered note classes (`abcjs-note`, `abcjs-lN`, etc.) to place the course labels horizontally under the corresponding music system.
 
