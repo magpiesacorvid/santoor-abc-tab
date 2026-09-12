@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Persian Santoor ABC → Tab</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:1000px;margin:2rem auto;padding:0 1rem;line-height:1.45}
+textarea{width:100%;box-sizing:border-box;font:14px ui-monospace,monospace;padding:.8rem}
+button{padding:.65rem 1rem;margin:.4rem .4rem .4rem 0;cursor:pointer}
+pre{white-space:pre-wrap;background:#f5f5f5;padding:1rem;border-radius:8px;overflow:auto}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+@media(max-width:800px){.grid{grid-template-columns:1fr}}
+small{color:#555}
+</style>
+</head>
+<body>
+<h1>Persian Santoor: ABC → Tab</h1>
+<p>Maps ABC notation to the 26 usable courses of the specified Persian <b>Dastgāh-e Šur</b> tuning.
+The closest course is chosen by frequency, using the exact Hz table below. Duplicate pitches use the
+lower physical group (B before M before H).</p>
+
+<div class="grid">
+<section>
+<h2>ABC input</h2>
+<textarea id="abc" rows="24">X:1
+T:Example
+M:4/4
+L:1/8
+K:C
+C D E F | G A B c | d e f g |</textarea>
+<button onclick="convert()">Convert</button>
+<button onclick="copyOutput()">Copy output</button>
+</section>
+<section>
+<h2>Santoor tab</h2>
+<pre id="output">Your tab will appear here.</pre>
+<p><small>Duration is shown in braces. Example: <code>M6{1/2}</code> means the mapped course is M6 and
+the ABC duration multiplier is 1/2 of the default note length. Chords become simultaneous labels such as
+<code>[M6+M1]</code>. Ties are shown with <code>~</code>.</small></p>
+</section>
+</div>
+
+<h2>26-course tuning</h2>
+<pre id="tuning"></pre>
+
+<script>
+const courses = [
+  ["B1","E3 koron",160.122],["B2","F3",174.614],["B3","G3",195.998],
+  ["B4","A3 koron",213.737],["B5","Bb3",233.082],["B6","C4",261.626],
+  ["B7","D4 koron",285.305],["B8","Eb4",311.127],["B9","F4",349.228],
+  ["M1","E4 koron",320.244],["M2","F4",349.228],["M3","G4",391.995],
+  ["M4","A4 koron",427.474],["M5","Bb4",466.164],["M6","C5",523.251],
+  ["M7","D5",587.330],["M8","Eb5",622.254],["M9","F5",698.456],
+  ["H1","E5 koron",640.487],["H2","F5",698.456],["H3","G5",783.991],
+  ["H4","Ab5",830.609],["H5","Bb5",932.328],["H6","C6",1046.502],
+  ["H7","D6",1174.659],["H8","Eb6",1244.508],["H9","F6",1396.913]
+];
+
+// ABC pitch: C = MIDI 60, c = MIDI 72. Accidentals are applied in semitones.
+// This intentionally treats ABC as 12-TET input, then finds the closest Persian-santur pitch.
+function abcPitchToHz(letter, accidental, octaveShift) {
+  const base = {C:60,D:62,E:64,F:65,G:67,A:69,B:71}[letter.toUpperCase()];
+  let midi = base + (letter === letter.toLowerCase() ? 12 : 0) + octaveShift;
+  midi += accidental;
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+function nearestCourse(hz) {
+  let best = null, bestCents = Infinity;
+  for (let i=0;i<courses.length;i++) {
+    const [label,name,f] = courses[i];
+    const cents = Math.abs(1200 * Math.log2(hz/f));
+    // courses are ordered B, M, H, so <= naturally gives the lower physical group on ties.
+    if (cents < bestCents - 1e-9) {
+      best = {label,name,f,cents};
+      bestCents = cents;
+    }
+  }
+  return best;
+}
+
+function parseAccidentalAt(s, i) {
+  let accidental = 0, start=i;
+  while (i<s.length && (s[i]==='^' || s[i]==='_' || s[i]==='=')) {
+    if (s[i]==='^') accidental += 1;
+    else if (s[i]==='_') accidental -= 1;
+    else accidental = 0;
+    i++;
+  }
+  return {accidental, i, had:i>start};
+}
+
+function durationText(s, i) {
+  // Returns ABC duration text after a note/rest/chord and new index.
+  const start=i;
+  if (s[i]==='/') {
+    i++;
+    let den='';
+    while(i<s.length && /\d/.test(s[i])) den+=s[i++];
+    return {text: den ? "1/"+den : "1/2", i};
+  }
+  let a='';
+  while(i<s.length && /\d/.test(s[i])) a+=s[i++];
+  if (s[i]==='/') {
+    i++;
+    let b='';
+    while(i<s.length && /\d/.test(s[i])) b+=s[i++];
+    return {text: a + "/" + (b || "2"), i};
+  }
+  return {text: a || "1", i};
+}
+
+function parseNoteToken(s, i) {
+  const acc = parseAccidentalAt(s,i); i=acc.i;
+  if (i>=s.length || !/[A-Ga-g]/.test(s[i])) return null;
+  const letter=s[i++];
+  let octaveShift=0;
+  while(i<s.length && (s[i]===',' || s[i]==="'")) {
+    octaveShift += s[i]===',' ? -12 : 12;
+    i++;
+  }
+  const dur=durationText(s,i); i=dur.i;
+  const hz=abcPitchToHz(letter,acc.accidental,octaveShift);
+  return {end:i, hz, duration:dur.text, accidental:acc.accidental, letter};
+}
+
+function convertChord(content) {
+  let i=0, labels=[], durations=[];
+  while(i<content.length) {
+    if (content[i]===' ' || content[i]==='\t') {i++; continue;}
+    const n=parseNoteToken(content,i);
+    if (!n) { i++; continue; }
+    const c=nearestCourse(n.hz);
+    labels.push(c.label);
+    durations.push(n.duration);
+    i=n.end;
+  }
+  if (!labels.length) return "";
+  // Chord duration normally applies to the chord as a whole; use first duration.
+  return "["+labels.join("+")+"]"+durationSuffix(durations[0]);
+}
+function durationSuffix(d) { return d==="1" ? "" : "{"+d+"}"; }
+
+function convertLine(line) {
+  // Leave ABC header lines untouched; convert only music body after K:/V: is not necessary.
+  let out="", i=0, pendingTie=false;
+  while(i<line.length) {
+    const ch=line[i];
+
+    if (ch==='%' ) { out += line.slice(i); break; }
+    if (ch==='"') { // quoted annotation: preserve it
+      let j=i+1; while(j<line.length && line[j]!=='"') j++;
+      out += line.slice(i, Math.min(j+1,line.length)); i=Math.min(j+1,line.length); continue;
+    }
+    if (ch==='[') {
+      const close=line.indexOf(']',i+1);
+      if(close!==-1) {
+        const chord=convertChord(line.slice(i+1,close));
+        out += chord;
+        i=close+1;
+        if(line[i]==='~'){out+='~';i++;}
+        continue;
+      }
+    }
+    const n=parseNoteToken(line,i);
+    if(n) {
+      const c=nearestCourse(n.hz);
+      let token=c.label+durationSuffix(n.duration);
+      if (pendingTie) token="~"+token;
+      out += token;
+      i=n.end;
+      if(line[i]==='~'){out+='~';i++;}
+      pendingTie=false;
+      continue;
+    }
+    // Rests, bars, spaces, tuplets, decorations, etc. are kept.
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
+function convert() {
+  const input=document.getElementById("abc").value.replace(/\r/g,"");
+  const lines=input.split("\n");
+  const result=lines.map(line=>{
+    // ABC headers are useful to keep. K: starts the key field, not a music line.
+    if (/^\s*[A-Za-z][A-Za-z0-9]*\s*:/.test(line)) return line;
+    return convertLine(line);
+  });
+  document.getElementById("output").textContent=result.join("\n");
+}
+
+function copyOutput() {
+  navigator.clipboard.writeText(document.getElementById("output").textContent);
+}
+
+document.getElementById("tuning").textContent =
+courses.map(([label,name,f]) => `${label.padEnd(3)} ${name.padEnd(10)} ${f.toFixed(3)} Hz`).join("\n");
+convert();
+</script>
+</body>
+</html>
