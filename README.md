@@ -9,7 +9,7 @@ A zero-dependency browser tool that converts common ABC music notation into tab 
 - Middle side: `M1`–`M9`
 - High side: `H1`–`H9`
 
-The full standard layout includes all 27 courses. If your own instrument has a broken bottom course, simply leave B1 untuned/unused; the converter still includes it so players with fully functioning instruments can use the complete range.
+The full standard layout includes all 27 courses. 
 
 ## Tuning
 
