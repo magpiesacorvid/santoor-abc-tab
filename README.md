@@ -6,10 +6,10 @@ A browser-based ABC notation viewer and tablature tool for a 27-course Persian s
 
 - ABC notation input
 - Standard sheet-music rendering using ABCJS
-- Three tablature groups:
-  - BASS: B1–B9
-  - MIDDLE: M1–M9
-  - HIGH: H1–H9
+- Three tablature groups, each drawn as a 9-line course stave:
+  - BASS: B9 is the top line; B1 is the bottom line
+  - MIDDLE: M9 is the top line; M1 is the bottom line
+  - HIGH: H9 is the top line; H1 is the bottom line
 - A4 reference selection
 - Persian Šur course frequencies
 - Nearest-course selection when ABC asks for a pitch not present on the instrument
