@@ -48,7 +48,7 @@
       </section>
 
       <section class="panel score-panel">
-        <div class="section-title">Sheet music + santoor tablature</div>
+        <div class="section-title">Sheet music + santoor tablature</div><div class="tab-explanation">Each register is a 9-course stave: course 9 is the highest line and course 1 is the lowest line.</div>
         <div id="warnings"></div>
         <div id="paper"></div>
         <div id="tab"></div>
@@ -61,7 +61,7 @@
     </section>
 
     <footer>
-      <p>27-course reference layout: B1–B9, M1–M9, H1–H9.</p>
+      <p>27-course reference layout: B1–B9, M1–M9, H1–H9< /p>
       <p>ABCJS is used under its MIT license. This project is an independent santoor tablature interface.</p>
     </footer>
   </main>
@@ -329,41 +329,60 @@ function renderTab(abc) {
       ["BASS","B"],["MIDDLE","M"],["HIGH","H"]
     ]) {
       const [label,prefix] = group;
-      const row = document.createElement("div");
-      row.className = "tab-row";
+      const groupBox = document.createElement("div");
+      groupBox.className = "tab-group";
 
-      const rowLabel = document.createElement("div");
-      rowLabel.className = "tab-row-label";
-      rowLabel.textContent = label;
-      row.appendChild(rowLabel);
+      const groupTitle = document.createElement("div");
+      groupTitle.className = "tab-group-title";
+      groupTitle.textContent = label;
+      groupBox.appendChild(groupTitle);
 
-      const lane = document.createElement("div");
-      lane.className = "tab-lane";
+      // IMPORTANT: the visual order is HIGH COURSE NUMBER at the top,
+      // LOW COURSE NUMBER at the bottom. Therefore B9 is above B1,
+      // M9 above M1, and H9 above H1.
+      const courses = COURSE_MAP.filter(c => c.id.startsWith(prefix))
+        .sort((a,b) => Number(b.id.slice(1)) - Number(a.id.slice(1)));
 
-      // Match the music's horizontal width.
       const svg = document.querySelector("#paper svg");
       const width = svg ? svg.getBoundingClientRect().width : 900;
-      lane.style.width = width + "px";
 
-      for (const item of systems.get(line)) {
-        const courses = item.mapped.filter(c => c.id.startsWith(prefix));
-        if (!courses.length) continue;
+      for (const course of courses) {
+        const row = document.createElement("div");
+        row.className = "course-staff-row";
 
-        const mark = document.createElement("span");
-        mark.className = "course-mark";
-        mark.style.left = item.x + "px";
-        mark.textContent = courses.map(c => c.id).join("+");
+        const rowLabel = document.createElement("div");
+        rowLabel.className = "course-staff-label";
+        rowLabel.textContent = course.id;
+        rowLabel.title = `${course.note}${course.cents ? " koron" : ""} — ${course.hz.toFixed(3)} Hz`;
+        row.appendChild(rowLabel);
 
-        const substituted = courses.some(c => c.distanceCents > 5);
-        if (substituted) mark.classList.add("substitution");
-        if (document.getElementById("showHz").checked && substituted) {
-          mark.title = courses.map(c => `${c.id}: ${c.hz.toFixed(3)} Hz`).join("\\n");
+        const lane = document.createElement("div");
+        lane.className = "course-staff-lane";
+        lane.style.width = width + "px";
+
+        // Find every note event that maps to this exact course.
+        for (const item of systems.get(line)) {
+          const matches = item.mapped.filter(c => c.id === course.id);
+          if (!matches.length) continue;
+
+          const mark = document.createElement("span");
+          mark.className = "course-mark";
+          mark.style.left = item.x + "px";
+          mark.textContent = "●";
+
+          const substituted = matches.some(c => c.distanceCents > 5);
+          if (substituted) mark.classList.add("substitution");
+          if (document.getElementById("showHz").checked && substituted) {
+            mark.title = `${course.id}: ${course.note}${course.cents ? " koron" : ""} — ${course.hz.toFixed(3)} Hz`;
+          }
+          lane.appendChild(mark);
         }
-        lane.appendChild(mark);
+
+        row.appendChild(lane);
+        groupBox.appendChild(row);
       }
 
-      row.appendChild(lane);
-      sys.appendChild(row);
+      sys.appendChild(groupBox);
     }
     tab.appendChild(sys);
   }
