@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Santoor ABC Tab</title>
+<meta name="description" content="ABC notation with Persian santoor course tablature">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/abcjs@6.6.4/dist/abcjs-basic-min.js"></script>
+</head>
+<body>
+<main class="container">
+<header class="titlebar">
+  <div><h1>Santoor ABC Tab</h1><p>Persian santoor · Dastgāh-e Šur · A4 = 440 Hz</p></div>
+  <div class="actions"><button id="printBtn">Print</button><button id="downloadBtn">Download ABC</button></div>
+</header>
+<section class="panel controls">
+  <div><label for="reference">Reference pitch</label><select id="reference"><option value="440" selected>A4 = 440 Hz</option><option value="442">A4 = 442 Hz</option><option value="432">A4 = 432 Hz</option></select></div>
+  <div><label for="fallback">Out-of-tuning pitches</label><select id="fallback"><option value="nearest" selected>Nearest santoor course</option></select></div>
+  <div class="legend"><span class="legend-chip high">HIGH</span><span class="legend-chip middle">MIDDLE</span><span class="legend-chip bass">BASS</span><span>Number = course to strike</span></div>
+</section>
+<section class="editor-layout">
+  <section class="panel editor">
+    <div class="section-title">ABC Editor</div>
+    <textarea id="abcInput" spellcheck="false"></textarea>
+    <div class="editor-help">Paste ABC notation here. The sheet music and santoor tablature update automatically.</div>
+  </section>
+  <section class="panel score-panel">
+    <div class="section-title">Sheet music + santoor tablature</div>
+    <div class="tab-explanation">Each system has three tablature lines. HIGH is above MIDDLE, and MIDDLE is above BASS. The course number is placed directly under its written note.</div>
+    <div id="warnings"></div>
+    <div id="systems"></div>
+  </section>
+</section>
+<section class="panel">
+  <div class="section-title">Šur santoor course map</div>
+  <div class="course-table" id="courseTable"></div>
+</section>
+<footer><p>Standard 27-course layout: B1–B9, M1–M9, H1–H9.</p><p>ABCJS is used under its MIT license. This is an independent santoor tablature interface.</p></footer>
+</main>
+<script>
+"use strict";
+
+// Exact user-specified course map. Within every register, the number increases with pitch.
+const COURSES = [
+ ["B1","E3",-50],["B2","F3",0],["B3","G3",0],["B4","A3",-50],["B5","Bb3",0],["B6","C4",0],["B7","D4",-50],["B8","Eb4",0],["B9","F4",0],
+ ["M1","E4",-50],["M2","F4",0],["M3","G4",0],["M4","A4",-50],["M5","Bb4",0],["M6","C5",0],["M7","D5",0],["M8","Eb5",0],["M9","F5",0],
+ ["H1","E5",-50],["H2","F5",0],["H3","G5",0],["H4","Ab5",0],["H5","Bb5",0],["H6","C6",0],["H7","D6",0],["H8","Eb6",0],["H9","F6",0]
+];
+const PCS={C:0,"C#":1,Db:1,D:2,"D#":3,Eb:3,E:4,F:5,"F#":6,Gb:6,G:7,"G#":8,Ab:8,A:9,"A#":10,Bb:10,B:11};
+const NAT={C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+function noteHz(note,cents=0,a4=440){const m=note.match(/^([A-G](?:#|b)?)(-?\d+)$/);if(!m)return NaN;const midi=12*(+m[2]+1)+PCS[m[1]];return a4*Math.pow(2,((midi-69)*100+cents)/1200)}
+function courseMap(){const a4=+document.getElementById('reference').value;return COURSES.map(([id,note,cents])=>({id,note,cents,hz:noteHz(note,cents,a4)}))}
+function keySignatureAccidentals(key){
+ const clean=(key||'C').trim().replace(/\s.*$/,'');
+ const major={C:{},G:{F:1},D:{F:1,C:1},A:{F:1,C:1,G:1},E:{F:1,C:1,G:1,D:1},B:{F:1,C:1,G:1,D:1,A:1},'F#':{F:1,C:1,G:1,D:1,A:1,E:1},Gb:{B:-1,E:-1,A:-1,D:-1,G:-1,C:-1},Db:{B:-1,E:-1,A:-1,D:-1,G:-1},Ab:{B:-1,E:-1,A:-1,D:-1},Eb:{B:-1,E:-1,A:-1},Bb:{B:-1,E:-1},F:{B:-1}};
+ const minor={Am:'C',Em:'G',Bm:'D','F#m':'A','C#m':'E','G#m':'B','D#m':'F#',Dm:'F',Gm:'Bb',Cm:'Eb',Fm:'Ab',Bbm:'Db',Ebm:'Gb',Abm:'Cb'};
+ return major[minor[clean]||clean]||{};
+}
+function abcKey(abc){const m=abc.match(/^\s*K:\s*([^\s]+)/m);return m?m[1]:'C'}
+
+// Convert an ABC note token to its written equal-tempered pitch. Octaves are taken from
+// the ABC spelling, not inferred from the note letter alone.
+function parsePitch(token,keyName,barAcc){
+ const m=token.match(/^([_=^]*)([A-Ga-g])([,']*)$/);if(!m)return null;
+ let acc=m[1]||'', raw=m[2], marks=m[3]||'', letter=raw.toUpperCase();
+ let octave=(raw===letter)?4:5;
+ for(const ch of marks){if(ch===',')octave--;else if(ch==="'")octave++}
+ let semi=NAT[letter];
+ if(!acc){const ka=keySignatureAccidentals(keyName)[letter];semi+=barAcc[letter]!==undefined?barAcc[letter]:(ka||0)}
+ else if(acc==='^'){semi++;barAcc[letter]=1}else if(acc==='^^'){semi+=2;barAcc[letter]=2}else if(acc==='_'){semi--;barAcc[letter]=-1}else if(acc==='__'){semi-=2;barAcc[letter]=-2}else if(acc==='='){barAcc[letter]=0}
+ while(semi<0){semi+=12;octave--} while(semi>=12){semi-=12;octave++}
+ const names=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+ const name=names[semi]+octave;return {name,hz:noteHz(name,0,+document.getElementById('reference').value)};
+}
+
+// Extract exactly the same musical note/chord events that are tagged into the ABC passed to ABCJS.
+function parseEvents(abc){
+ const key=abcKey(abc), events=[];let afterK=false, id=0, barAcc={};
+ for(const rawLine of abc.split(/\r?\n/)){
+   if(/^\s*K:/.test(rawLine)){afterK=true;barAcc={};continue}
+   if(!afterK||/^\s*%/.test(rawLine)||/^\s*[A-Za-z]:/.test(rawLine))continue;
+   const line=rawLine.replace(/\\\s*$/,'');let i=0;
+   while(i<line.length){const ch=line[i];
+     if(ch==='|'){barAcc={};i++;continue}
+     if(ch==='"'){const j=line.indexOf('"',i+1);i=j<0?line.length:j+1;continue}
+     if(ch==='!'||ch==='+'){const j=line.indexOf(ch,i+1);i=j<0?line.length:j+1;continue}
+     if(ch==='{'){const j=line.indexOf('}',i+1);if(j>=0){const inside=line.slice(i+1,j);const ts=inside.match(/[_=^]*[A-Ga-g][,']*/g)||[];for(const t of ts){const p=parsePitch(t,key,barAcc);if(p)events.push({id:id++,pitches:[p]})}i=j+1;continue}}
+     if(ch==='['){const j=line.indexOf(']',i+1);if(j>=0){const inside=line.slice(i+1,j);const ts=inside.match(/[_=^]*[A-Ga-g][,']*/g)||[];const pitches=ts.map(t=>parsePitch(t,key,barAcc)).filter(Boolean);events.push({id:id++,pitches});i=j+1;while(i<line.length&&/[0-9\/-]/.test(line[i]))i++;continue}}
+     if(/[A-Ga-g]/.test(ch)||/[_=^]/.test(ch)){
+       const m=line.slice(i).match(/^([_=^]*)([A-Ga-g])([,']*)(?:[0-9]*\/?[0-9]*)?/);
+       if(m){const pitch=m[1]+m[2]+m[3];const p=parsePitch(pitch,key,barAcc);if(p)events.push({id:id++,pitches:[p]});i+=m[0].length;continue}
+     }
+     i++;
+   }
+ }
+ return events;
+}
+
+// Tag notes before rendering. ABCJS supports custom classes via !class=...!, giving us a
+// reliable one-to-one link between a parsed ABC event and the exact SVG note it produced.
+function decorateABC(abc){
+ let afterK=false,eventId=0;const key=abcKey(abc);let barAcc={};
+ return abc.split(/\r?\n/).map(line=>{
+   if(/^\s*K:/.test(line)){afterK=true;barAcc={};return line}
+   if(!afterK||/^\s*%/.test(line)||/^\s*[A-Za-z]:/.test(line))return line;
+   let out='',i=0;
+   while(i<line.length){const ch=line[i];
+     if(ch==='|'){barAcc={};out+=ch;i++;continue}
+     if(ch==='"'){const j=line.indexOf('"',i+1);const e=j<0?line.length:j+1;out+=line.slice(i,e);i=e;continue}
+     if(ch==='!'||ch==='+'){const j=line.indexOf(ch,i+1);const e=j<0?line.length:j+1;out+=line.slice(i,e);i=e;continue}
+     if(ch==='{'){const j=line.indexOf('}',i+1);if(j>=0){out+=line.slice(i,j+1);i=j+1;continue}}
+     if(ch==='['){const j=line.indexOf(']',i+1);if(j>=0){const tok=line.slice(i,j+1);out+='!class=santoor-note-'+eventId+'!'+tok;eventId++;i=j+1;continue}}
+     if(/[A-Ga-g]/.test(ch)||/[_=^]/.test(ch)){
+       const m=line.slice(i).match(/^([_=^]*)([A-Ga-g])([,']*)(?:[0-9]*\/?[0-9]*)?/);
+       if(m){out+='!class=santoor-note-'+eventId+'!'+m[0];eventId++;i+=m[0].length;continue}
+     }
+     out+=ch;i++;
+   }
+   return out;
+ }).join('\n');
+}
+function nearestCourse(hz){let best=null,diff=Infinity;for(const c of courseMap()){const d=Math.abs(1200*Math.log2(hz/c.hz));if(d<diff){diff=d;best={...c,distanceCents:d}}}return best}
+function mapEvent(e){return e.pitches.map(p=>nearestCourse(p.hz))}
+
+function buildTabSystem(svg,events){
+ const wrap=document.createElement('div');wrap.className='system-block';
+ const scoreHost=document.createElement('div');scoreHost.className='score-host';
+ // Move the existing SVG into our system wrapper.
+ scoreHost.appendChild(svg);wrap.appendChild(scoreHost);
+ const tab=document.createElement('div');tab.className='santoor-tab';
+ const svgRect=svg.getBoundingClientRect();
+ const noteEls=Array.from(svg.querySelectorAll('.abcjs-note'));
+ const rows=[['HIGH','H'],['MIDDLE','M'],['BASS','B']];
+ for(const [label,prefix] of rows){
+   const row=document.createElement('div');row.className='tab-row';
+   const lab=document.createElement('div');lab.className='tab-label';lab.textContent=label;
+   const lane=document.createElement('div');lane.className='tab-lane';row.appendChild(lab);row.appendChild(lane);
+   for(const el of noteEls){
+     const cls=Array.from(el.classList).find(c=>c.startsWith('santoor-note-'));if(!cls)continue;
+     const idx=Number(cls.split('-').pop());const e=events[idx];if(!e)continue;
+     const matches=mapEvent(e).filter(c=>c.id[0]===prefix);if(!matches.length)continue;
+     const nr=el.getBoundingClientRect();const x=nr.left+nr.width/2-svgRect.left;
+     const n=document.createElement('span');n.className='tab-number';n.style.left=x+'px';n.textContent=matches.map(c=>c.id.slice(1)).join('/');
+     lane.appendChild(n);
+   }
+   tab.appendChild(row);
+ }
+ wrap.appendChild(tab);return wrap;
+}
+
+function render(){
+ const raw=document.getElementById('abcInput').value;const systems=document.getElementById('systems');const warnings=document.getElementById('warnings');systems.innerHTML='';warnings.textContent='';
+ try{
+   const events=parseEvents(raw);const tagged=decorateABC(raw);
+   const temp=document.createElement('div');temp.className='abc-render-temp';document.body.appendChild(temp);
+   ABCJS.renderAbc(temp,tagged,{responsive:'resize',add_classes:true,staffwidth:960,oneSvgPerLine:true,wrap:{minSpacing:1.7,maxSpacing:2.5,preferredMeasuresPerLine:5},paddingtop:8,paddingbottom:8});
+   const svgs=Array.from(temp.querySelectorAll('svg'));
+   if(!svgs.length)throw new Error('No music could be rendered.');
+   // Each SVG is one wrapped notation system. ABCJS explicitly supports oneSvgPerLine,
+   // and its custom classes let us align tab numbers to exact notes.
+   for(const svg of svgs)systems.appendChild(buildTabSystem(svg,events));
+   document.title='Santoor ABC Tab';
+   requestAnimationFrame(()=>repositionTabs());
+ }catch(err){warnings.textContent='ABC rendering error: '+err.message}
+}
+function repositionTabs(){
+ document.querySelectorAll('.system-block').forEach(block=>{
+   const svg=block.querySelector('svg');if(!svg)return;const sr=svg.getBoundingClientRect();
+   block.querySelectorAll('.tab-number').forEach(n=>{const id=n.previousElementSibling;});
+   const noteEls=Array.from(svg.querySelectorAll('.abcjs-note'));
+   block.querySelectorAll('.tab-number').forEach(n=>{
+     const idx=Number(n.dataset.noteIndex);const el=noteEls[idx];if(el){const nr=el.getBoundingClientRect();n.style.left=(nr.left+nr.width/2-sr.left)+'px'}
+   });
+   block.querySelectorAll('.tab-lane').forEach(l=>l.style.width=sr.width+'px');
+ }
+}
+
+const defaultABC=`X:1\nT:Example — Šur Santoor\nM:4/4\nL:1/4\nQ:1/4=100\nK:C\nC D E F | G A B c | d c B A | G F E D |\nC2 E2 | G2 c2 | d c B A | C4 |`;
+document.getElementById('abcInput').value=defaultABC;
+function buildCourseTable(){const root=document.getElementById('courseTable');root.innerHTML='';for(const p of ['B','M','H']){const group=document.createElement('div');group.className='course-group';const h=document.createElement('h3');h.textContent=p==='B'?'Bass':p==='M'?'Middle':'High';group.appendChild(h);for(const c of courseMap().filter(x=>x.id[0]===p).reverse()){const d=document.createElement('div');d.className='course';d.innerHTML=`<strong>${c.id}</strong><span>${c.note}${c.cents?' koron':''}</span><span>${c.hz.toFixed(3)} Hz</span>`;group.appendChild(d)}root.appendChild(group)}}
+buildCourseTable();
+document.getElementById('abcInput').addEventListener('input',render);
+document.getElementById('reference').addEventListener('change',()=>{buildCourseTable();render()});
+document.getElementById('printBtn').addEventListener('click',()=>window.print());
+document.getElementById('downloadBtn').addEventListener('click',()=>{const blob=new Blob([document.getElementById('abcInput').value],{type:'text/plain;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='santoor-tune.abc';a.click();URL.revokeObjectURL(a.href)});
+window.addEventListener('resize',()=>{clearTimeout(window.__resize);window.__resize=setTimeout(()=>{document.querySelectorAll('.system-block').forEach(b=>b.remove());render()},150)});
+render();
+</script>
+</body></html>
