@@ -19,18 +19,6 @@ A browser-based ABC notation viewer and tablature tool for a 27-course Persian s
 - Download the entered ABC
 - No server/backend required
 
-## Run locally
-
-Just open `index.html` in a modern browser.
-
-## GitHub Pages
-
-1. Create a public repository, e.g. `santoor-abc-tab`.
-2. Upload `index.html` and `styles.css`.
-3. Settings → Pages.
-4. Deploy from `main` / root.
-5. Open the generated Pages URL.
-
 ## Layout implementation
 
 Each wrapped music system is rendered as its own SVG, with its matching 27-course santoor tablature inserted directly underneath. This keeps each notation system and its tab together when the music wraps across the page.
@@ -39,11 +27,6 @@ The tab renderer uses ABCJS's rendered note classes (`abcjs-note`, `abcjs-lN`, e
 
 ABCJS's rendered-object/class APIs are documented as useful but volatile; if ABCJS is upgraded, the tab alignment code should be retested.
 
-## Licensing / attribution
-
-This project uses ABCJS from the public CDN. ABCJS is MIT licensed.
-
-This is an independent santoor interface and is not affiliated with Rick van der Sluijs or Diatotab.
 
 
 ## Course direction
@@ -64,3 +47,9 @@ On the displayed tablature, the visual line order is therefore reversed within e
 - Uses ABCJS `oneSvgPerLine` so every wrapped notation system is a separate SVG.
 - Places the matching santoor tablature immediately below each notation system.
 - Aligns course markers to the note positions within that system.
+  
+ Licensing / attribution
+
+This project uses ABCJS from the public CDN. ABCJS is MIT licensed.
+
+This is an independent santoor interface and is not affiliated with Rick van der Sluijs or Diatotab.
